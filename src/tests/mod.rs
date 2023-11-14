@@ -126,19 +126,19 @@ fn test_read_ok() {
 
     assert!(device.read());
 
-    let voltage_1 = device.voltage_1();
-    let current_1 = device.current_1();
-    let power_1 = device.power_1();
-    let positive_energy_1 = device.positive_energy_1();
-    let negative_energy_1 = device.negative_energy_1();
-    let factor_1 = device.factor_1();
+    let voltage_1 = device.channel1.voltage();
+    let current_1 = device.channel1.current();
+    let power_1 = device.channel1.power();
+    let positive_energy_1 = device.channel1.positive_energy();
+    let negative_energy_1 = device.channel1.negative_energy();
+    let factor_1 = device.channel1.factor();
 
-    let voltage_2 = device.voltage_2();
-    let current_2 = device.current_2();
-    let power_2 = device.power_2();
-    let positive_energy_2 = device.positive_energy_2();
-    let negative_energy_2 = device.negative_energy_2();
-    let factor_2 = device.factor_1();
+    let voltage_2 = device.channel2.voltage();
+    let current_2 = device.channel2.current();
+    let power_2 = device.channel2.power();
+    let positive_energy_2 = device.channel2.positive_energy();
+    let negative_energy_2 = device.channel2.negative_energy();
+    let factor_2 = device.channel2.factor();
 
     let frequency = device.frequency();
 
@@ -165,18 +165,19 @@ fn test_read_ok_2() {
 
     assert!(device.read());
 
-    let voltage_1 = device.voltage_1();
-    let current_1 = device.current_1();
-    let power_1 = device.power_1();
-    let positive_energy_1 = device.positive_energy_1();
-    let negative_energy_1 = device.negative_energy_1();
-    let factor_1 = device.factor_1();
+    let voltage_1 = device.channel1.voltage();
+    let current_1 = device.channel1.current();
+    let power_1 = device.channel1.power();
+    let positive_energy_1 = device.channel1.positive_energy();
+    let negative_energy_1 = device.channel1.negative_energy();
+    let factor_1 = device.channel1.factor();
 
-    let voltage_2 = device.voltage_2();
-    let current_2 = device.current_2();
-    let power_2 = device.power_2();
-    let positive_energy_2 = device.positive_energy_2();
-    let negative_energy_2 = device.negative_energy_2();
+    let voltage_2 = device.channel2.voltage();
+    let current_2 = device.channel2.current();
+    let power_2 = device.channel2.power();
+    let positive_energy_2 = device.channel2.positive_energy();
+    let negative_energy_2 = device.channel2.negative_energy();
+    let factor_2 = device.channel2.factor();
 
     let frequency = device.frequency();
 
@@ -192,6 +193,7 @@ fn test_read_ok_2() {
     assert_eq!(power_2, 0.0);
     assert_eq!(positive_energy_2, 0.0);
     assert_eq!(negative_energy_2, 0.0);
+    assert_eq!(factor_2, 0.0);
     
     assert_eq!(frequency, 50.0099983);
 }
@@ -223,6 +225,6 @@ fn test_jsk_mk_196_change_bitrate_method_return_true() {
 
     device.change_bitrate(crate::ChangeBitrate::B9600);
 
-    assert_eq!(device.get_uart().segment_write_len, crate::SEGMENT_WRITE_CHANGE_BIT_RATE);
-    assert_eq!(device.get_uart().segment_write, [0x00, 0x10, 0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x06, 0x2b, 0xd6]);
+    assert_eq!(device.get_hardware().borrow().get_uart().segment_write_len, crate::SEGMENT_WRITE_CHANGE_BIT_RATE);
+    assert_eq!(device.get_hardware().borrow().get_uart().segment_write, [0x00, 0x10, 0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x06, 0x2b, 0xd6]);
 }

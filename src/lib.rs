@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 /// JSY-MK-194 is hardware to read power of line.
 /// Please see official website here: https://jsy-tek.com/products/ac-electric-energy-metering-module/single-phase-2-way-power-metering-module-modbus-ttl-electric-energy-metering-pcba
 /// 
@@ -35,37 +37,30 @@ const READ_DATA_SIZE: usize = 61;
 /// Size of message to write change bitrate
 const SEGMENT_WRITE_CHANGE_BIT_RATE: usize = 11;
 
+/// Channel 1 offset
+const CHANNEL_1_OFFSET: usize = 3;
+/// Channel 1 offset
+const CHANNEL_2_OFFSET: usize = 35;
 
-/// Voltage 1 position in data
-const VOLTAGE_1: usize = 3;
-/// Voltage 2 position in data
-const VOLTAGE_2: usize = 35;
-/// Current 1 position in data
-const CURRENT_1: usize = 7;
-/// Current 1 position in data
-const CURRENT_2: usize = 39;
+/// Voltage position in data
+const VOLTAGE: usize = 0;
+/// Current position in data
+const CURRENT: usize = 4;
+/// Power
+const POWER: usize = 8;
+/// Positive energy
+const POSITIVE_ENERGY: usize = 12;
+/// Factor
+const FACTOR: usize = 16;
+/// Negative energy
+const NEGATIVE_ENERGY: usize = 20;
+
 /// Frequency position in data
 const FREQUENCY: usize = 31;
-/// Positive energy 1
-const POSITIVE_ENERGY_1: usize = 15;
-/// Positive energy 
-const POSITIVE_ENERGY_2: usize = 47;
-/// Negative energy 1
-const NEGATIVE_ENERGY_1: usize = 23;
-/// Negative energy 2
-const NEGATIVE_ENERGY_2: usize = 55;
-/// Power 1
-const POWER_1: usize = 11;
-/// Power 2
-const POWER_2: usize = 43;
 /// Power sign 1
 const POWER_SIGN_1: usize = 27;
 /// Power sign 2
 const POWER_SIGN_2: usize = 28;
-/// Factor 1
-const FACTOR_1: usize = 19;
-/// Factor 2
-const FACTOR_2: usize = 51;
 
 
 /// Value to change bitrate
@@ -85,8 +80,7 @@ pub trait Uart {
     /// Write multiple bytes from a slice
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Self::Error>;
 }
-
-pub struct JsyMk194<U, D> 
+pub struct JsyMk194Hardware<U, D> 
 where
     U: Uart,
     D: DelayMs<u16>
@@ -94,22 +88,22 @@ where
     uart: U,
     delay: D,
     segment_write: [u8; SEGMENT_WRITE], //= {0x01, 0x03, 0x00, 0x48, 0x00, 0x0E, 0x44, 0x18};
-    segment_read: [u8; SEGMENT_READ]
+    segment_read: [u8; SEGMENT_READ],
 }
 
-impl<U, D> JsyMk194<U, D> 
+impl<U, D> JsyMk194Hardware<U, D> 
 where
     U: Uart,
     D: DelayMs<u16>
 {
     /// Create a new struct of JsyMk194.
     pub fn new(uart: U, delay: D) -> Self {
-      JsyMk194 {
-        uart,
-        delay,
-        segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
-        segment_read: [0; SEGMENT_READ]
-      }
+        Self {
+            uart,
+            delay,
+            segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
+            segment_read: [0; SEGMENT_READ]
+        }
     }
 
     /// Read data.
@@ -137,70 +131,10 @@ where
         return true;
     }
 
-    /// Return the voltage of first channel in volt.
-    pub fn voltage_1(&self) -> f32 {
-        (self.get_data(VOLTAGE_1) as f32) * 0.0001
-    }
-
-    /// Return the voltage of second channel in volt.
-    pub fn voltage_2(&self) -> f32 {
-        (self.get_data(VOLTAGE_2) as f32) * 0.0001
-    }
-
     /// Return frequency in hz.
     pub fn frequency(&self) -> f32 {
         (self.get_data(FREQUENCY) as f32) * 0.01
     }
-
-    /// Return current in A of channel 1.
-    pub fn current_1(&self) -> f32 { 
-        (self.get_data(CURRENT_1) as f32) * 0.0001
-    }
-
-    /// Return current in A of channel 2.
-    pub fn current_2(&self)-> f32 {
-        (self.get_data(CURRENT_2) as f32) * 0.0001
-    }
-
-    /// Return positive energy in kW/h of channel 1.
-    pub fn positive_energy_1(&self)-> f32 {
-        (self.get_data(POSITIVE_ENERGY_1) as f32) * 0.0001
-    }
-
-    /// Return negative energy in kW/h of channel 1.
-    pub fn negative_energy_1(&self)-> f32 {
-        (self.get_data(NEGATIVE_ENERGY_1) as f32) * 0.0001
-    }
-
-    /// Return positive energy in kW/h of channel 2.
-    pub fn positive_energy_2(&self)-> f32 {
-        (self.get_data(POSITIVE_ENERGY_2) as f32) * 0.0001
-    }
-
-    /// Return negative energy in kW/h of channel 2.
-    pub fn negative_energy_2(&self)-> f32 {
-        (self.get_data(NEGATIVE_ENERGY_2) as f32) * 0.0001
-    }
-
-    /// Return the power of channel 1 in watt.
-    pub fn power_1(&self) -> f32 {
-       self.power(POWER_1, POWER_SIGN_1)
-    }
-
-    /// Return the power of channel 1 in watt.
-    pub fn power_2(&self) -> f32 {
-       self.power(POWER_2, POWER_SIGN_2)
-    }
-
-    /// Return the power of channel 1 in watt.
-    pub fn factor_1(&self) -> f32 {
-        (self.get_data(FACTOR_1) as f32) * 0.001
-     }
- 
-     /// Return the power of channel 1 in watt.
-     pub fn factor_2(&self) -> f32 {
-        (self.get_data(FACTOR_2) as f32) * 0.001
-     }
 
     /// Default bitrate is 4800, you can update the bitrate of module
     /// the available values are : 4800, 9600, 19200, 38400.
@@ -260,5 +194,116 @@ where
     #[cfg(test)]
     fn get_uart(&self) -> &U {
         &self.uart
+    }
+}
+
+
+pub struct Channel<U, D>
+where
+    U: Uart,
+    D: DelayMs<u16>
+{
+    hardware: Option<Rc<RefCell<JsyMk194Hardware<U, D>>>>,
+    data_offset: usize,
+    power_sign: usize,
+}
+
+impl<U, D>  Channel<U, D> 
+where
+    U: Uart,
+    D: DelayMs<u16>
+{
+    pub fn new(hardware: Option<&Rc<RefCell<JsyMk194Hardware<U, D>>>>, data_offset: usize, power_sign: usize) -> Self {
+        match hardware {
+            None => Self {
+                hardware: None,
+                data_offset,
+                power_sign
+            },
+            Some(h) => Self {
+                hardware: Some(h.clone()),
+                data_offset,
+                power_sign
+            }
+        }
+    }
+
+    /// Return the voltage of first channel in volt.
+    pub fn voltage(&self) -> f32 {
+        (self.hardware.as_ref().unwrap().as_ref().borrow().get_data(self.data_offset + VOLTAGE) as f32) * 0.0001
+    }
+
+    /// Return current in A of channel.
+    pub fn current(&self) -> f32 { 
+        (self.hardware.as_ref().unwrap().borrow().get_data(self.data_offset + CURRENT) as f32) * 0.0001
+    }
+
+    /// Return positive energy in kW/h of channel.
+    pub fn positive_energy(&self)-> f32 {
+        (self.hardware.as_ref().unwrap().borrow().get_data(self.data_offset + POSITIVE_ENERGY) as f32) * 0.0001
+    }
+
+    /// Return negative energy in kW/h of channel.
+    pub fn negative_energy(&self)-> f32 {
+        (self.hardware.as_ref().unwrap().borrow().get_data(self.data_offset + NEGATIVE_ENERGY) as f32) * 0.0001
+    }
+
+    /// Return the power of channel in watt.
+    pub fn power(&self) -> f32 {
+        self.hardware.as_ref().unwrap().borrow().power(self.data_offset + POWER, self.power_sign)
+    }
+
+    /// Return the power of channel in watt.
+    pub fn factor(&self) -> f32 {
+        (self.hardware.as_ref().unwrap().borrow().get_data(self.data_offset + FACTOR) as f32) * 0.001
+    }
+}
+
+pub struct JsyMk194<U, D> 
+where
+    U: Uart,
+    D: DelayMs<u16>
+{
+    hardware: Rc<RefCell<JsyMk194Hardware<U, D>>>,
+    pub channel1: Channel<U, D>,
+    pub channel2: Channel<U, D>,
+}
+
+impl<U, D> JsyMk194<U, D> 
+where
+    U: Uart,
+    D: DelayMs<u16>
+{
+    /// Create a new struct of JsyMk194.
+    pub fn new(uart: U, delay: D) -> Self {
+        let h = JsyMk194Hardware::new(uart, delay);
+
+        let mut me = Self {
+            hardware: Rc::new(RefCell::new(h)),
+            channel1: Channel::new(None, CHANNEL_1_OFFSET, POWER_SIGN_1),
+            channel2: Channel::new(None, CHANNEL_2_OFFSET, POWER_SIGN_2),
+        };
+
+        me.channel1.hardware = Some(me.hardware.clone());
+        me.channel2.hardware = Some(me.hardware.clone());
+
+        me
+    }
+
+    pub fn read(&mut self) -> bool {
+        self.hardware.borrow_mut().read()
+    }
+
+    pub fn frequency(&self) -> f32 {
+        self.hardware.borrow().frequency()
+    }
+
+    pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> bool {
+        self.hardware.borrow_mut().change_bitrate(new_bitrate)
+    }
+
+    #[cfg(test)]
+    fn get_hardware(&self) -> &Rc<RefCell<JsyMk194Hardware<U, D>>> {
+        &self.hardware
     }
 }
