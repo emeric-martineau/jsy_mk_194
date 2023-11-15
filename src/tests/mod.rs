@@ -58,15 +58,11 @@ struct UartTestImpl {
     pub segment_read: [u8; crate::READ_DATA_SIZE]
 }
 
-type UartError = std::io::Error;
-
 impl crate::Uart for UartTestImpl {
-    type Error = UartError;
-
-    fn read(&mut self, buf: &mut [u8], _timeout: u32) -> Result<usize, Self::Error> {
+    fn read(&mut self, buf: &mut [u8], _timeout: u32) -> Result<usize, crate::error::UartError> {
         match self.segment_read {
             READ_DATA_WRONG_SIZE => Ok(1),
-            READ_DATA_ERROR => Err(UartError::new(std::io::ErrorKind::Other, "Error read")),
+            READ_DATA_ERROR => Err(crate::error::UartError::new(crate::error::UartErrorKind::ReadInsuffisantBytes, "Error read".to_string())),
             _ => {
                 let mut index = 0;
 
@@ -80,11 +76,11 @@ impl crate::Uart for UartTestImpl {
         }
     }
 
-    fn write(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, crate::error::UartError> {
         self.segment_write_len = bytes.len();
 
         if self.segment_write == WRITE_DATA_ERROR {
-            return Err(UartError::new(std::io::ErrorKind::Other, "Error write"))
+            return Err(crate::error::UartError::new(crate::error::UartErrorKind::WriteInsuffisantBytes, "Error write".to_string()))
         }
 
 
@@ -124,7 +120,7 @@ fn setup(read_data: [u8; crate::READ_DATA_SIZE], write_data: [u8; crate::SEGMENT
 fn test_read_ok() {
     let mut device = setup(READ_DATA_OK, WRITE_DATA_OK);
 
-    assert!(device.read());
+    assert!(device.read().is_ok());
 
     let voltage_1 = device.channel1.voltage();
     let current_1 = device.channel1.current();
@@ -163,7 +159,7 @@ fn test_read_ok() {
 fn test_read_ok_2() {
     let mut device = setup(READ_DATA_OK_2, WRITE_DATA_OK);
 
-    assert!(device.read());
+    assert!(device.read().is_ok());
 
     let voltage_1 = device.channel1.voltage();
     let current_1 = device.channel1.current();
@@ -202,28 +198,29 @@ fn test_read_ok_2() {
 fn test_jsk_mk_196_read_method_return_error_cause_write_to_device_return_error() {
     let mut device = setup(READ_DATA_OK, WRITE_DATA_ERROR);
 
-    assert!(device.read() == false);
+    assert!(device.read().is_err() == true);
+
 }
 
 #[test]
 fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_error() {
     let mut device = setup(READ_DATA_ERROR, WRITE_DATA_OK);
 
-    assert!(device.read() == false);
+    assert!(device.read().is_err() == true);
 }
 
 #[test]
 fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_wrong_size() {
     let mut device = setup(READ_DATA_WRONG_SIZE, WRITE_DATA_OK);
 
-    assert!(device.read() == false);
+    assert!(device.read().is_err() == true);
 }
 
 #[test]
 fn test_jsk_mk_196_change_bitrate_method_return_true() {
     let mut device = setup(READ_DATA_OK, WRITE_DATA_OK);
 
-    device.change_bitrate(crate::ChangeBitrate::B9600);
+    assert!(device.change_bitrate(crate::ChangeBitrate::B9600).is_ok());
 
     assert_eq!(device.get_hardware().borrow().get_uart().segment_write_len, crate::SEGMENT_WRITE_CHANGE_BIT_RATE);
     assert_eq!(device.get_hardware().borrow().get_uart().segment_write, [0x00, 0x10, 0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x06, 0x2b, 0xd6]);

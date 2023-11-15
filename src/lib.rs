@@ -25,6 +25,7 @@ use std::{cell::RefCell, rc::Rc};
 ///   [15] negative kwh2 = 55, 56, 57, 58
 use embedded_hal::blocking::delay::DelayMs;
 
+pub mod error;
 #[cfg(test)]
 mod tests;
 
@@ -72,13 +73,11 @@ pub enum ChangeBitrate {
 }
 
 pub trait Uart {
-    type Error;
-
     /// Read multiple bytes into a slice
-    fn read(&mut self, buf: &mut [u8], timeout: u32) -> Result<usize, Self::Error>;
+    fn read(&mut self, buf: &mut [u8], timeout: u32) -> Result<usize, error::UartError>;
     
     /// Write multiple bytes from a slice
-    fn write(&mut self, bytes: &[u8]) -> Result<usize, Self::Error>;
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, error::UartError>;
 }
 pub struct JsyMk194Hardware<U, D> 
 where
@@ -107,12 +106,12 @@ where
     }
 
     /// Read data.
-    pub fn read(&mut self) -> bool {     
+    pub fn read(&mut self) -> Result<(), error::UartError> {     
         // send segment to JSY-MK-194
         let write_result = self.uart.write(&self.segment_write);
 
         if write_result.is_err() {
-          return false;
+          return Err(write_result.unwrap_err());
         }        
 
         let is_read_data = self.uart.read(&mut self.segment_read, 100);
@@ -120,15 +119,17 @@ where
         match is_read_data {
           Ok(data_size) => {
             if data_size != READ_DATA_SIZE {
-              return false;
+              return Err(
+                error::UartError::new(
+                error::UartErrorKind::WriteInsuffisantBytes,
+                format!("Try to read {} bytes, but Uart read only {} bytes", READ_DATA_SIZE, data_size)));
             }
 
             // TODO check CRC ?
+            Ok(())
           },
-          Err(_) => return false
+          Err(e) => Err(e)
         }
-
-        return true;
     }
 
     /// Return frequency in hz.
@@ -139,7 +140,7 @@ where
     /// Default bitrate is 4800, you can update the bitrate of module
     /// the available values are : 4800, 9600, 19200, 38400.
     /// Return true if success.
-    pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> bool {
+    pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> Result<(), error::ChangeBitrateError> {
         let mut segment: [u8; SEGMENT_WRITE_CHANGE_BIT_RATE] = [0x00, 0x10, 0x00, 0x04, 0x00, 0x01,
                                      0x02, 0x01, 0x00, 0x00, 0x00];
 
@@ -155,8 +156,21 @@ where
         let result = self.uart.write(&segment);
 
         match result {
-          Ok(write_size) => write_size == segment.len(),
-          Err(_) => false
+            Ok(write_size) => {
+                if write_size == segment.len() {
+                    return Ok(());
+                }
+
+                Err(
+                    error::ChangeBitrateError::new(
+                        error::UartError::new(
+                            error::UartErrorKind::WriteInsuffisantBytes,
+                            format!("Try to write {} bytes, but Uart write only {} bytes", segment.len(), write_size)
+                        )
+                    )
+                )
+            },
+            Err(e) => Err(error::ChangeBitrateError::new(e))
         }
     }
 
@@ -290,7 +304,7 @@ where
         me
     }
 
-    pub fn read(&mut self) -> bool {
+    pub fn read(&mut self) -> Result<(), error::UartError> {
         self.hardware.borrow_mut().read()
     }
 
@@ -298,7 +312,7 @@ where
         self.hardware.borrow().frequency()
     }
 
-    pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> bool {
+    pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> Result<(), error::ChangeBitrateError> {
         self.hardware.borrow_mut().change_bitrate(new_bitrate)
     }
 
