@@ -162,7 +162,7 @@ where
             if data_size != READ_DATA_SIZE {
               return Err(
                 error::UartError::new(
-                error::UartErrorKind::WriteInsuffisantBytes,
+                error::UartErrorKind::ReadInsuffisantBytes,
                 format!("Try to read {} bytes, but Uart read only {} bytes", READ_DATA_SIZE, data_size)));
             }
 

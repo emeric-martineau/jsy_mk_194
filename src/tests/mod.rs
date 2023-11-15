@@ -218,22 +218,30 @@ fn test_read_ok_2() {
 fn test_jsk_mk_196_read_method_return_error_cause_write_to_device_return_error() {
     let mut device = setup(READ_DATA_OK, WRITE_DATA_ERROR);
 
-    assert!(device.read().is_err() == true);
-
+    match device.read() {
+        Ok(()) => assert!(false),
+        Err(e) => assert_eq!(e.kind, crate::error::UartErrorKind::WriteInsuffisantBytes)
+    };
 }
 
 #[test]
 fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_error() {
     let mut device = setup(READ_DATA_ERROR, WRITE_DATA_OK);
 
-    assert!(device.read().is_err() == true);
+    match device.read() {
+        Ok(()) => assert!(false),
+        Err(e) => assert_eq!(e.kind, crate::error::UartErrorKind::ReadInsuffisantBytes)
+    };
 }
 
 #[test]
 fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_wrong_size() {
     let mut device = setup(READ_DATA_WRONG_SIZE, WRITE_DATA_OK);
 
-    assert!(device.read().is_err() == true);
+    match device.read() {
+        Ok(()) => assert!(false),
+        Err(e) => assert_eq!(e.kind, crate::error::UartErrorKind::ReadInsuffisantBytes)
+    };
 }
 
 #[test]
@@ -256,5 +264,8 @@ fn test_crc() {
 fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_bad_crc() {
     let mut device = setup(READ_DATA_BAD_CRC, WRITE_DATA_OK);
 
-    assert!(device.read().is_err() == true);
+    match device.read() {
+        Ok(()) => assert!(false),
+        Err(e) => assert_eq!(e.kind, crate::error::UartErrorKind::BadCrc)
+    };
 }
