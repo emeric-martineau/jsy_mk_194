@@ -4,6 +4,7 @@ use std::fmt;
 pub enum UartErrorKind {
     Read,
     ReadInsuffisantBytes,
+    BadCrc,
     Write,
     WriteInsuffisantBytes,
     Other,

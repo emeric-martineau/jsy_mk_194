@@ -40,6 +40,26 @@ const READ_DATA_OK_2: [u8; crate::READ_DATA_SIZE] = [
     0x79, 0xB0 
     ];
 
+/// When put this data in segment_read, JsyMk194Hardware.read() return error, bad CRC
+const READ_DATA_BAD_CRC: [u8; crate::READ_DATA_SIZE] = [
+    0x01, 0x03, 0x38,
+    0x00, 0x24, 0x8E, 0x5F,
+    0x00, 0x00, 0x94, 0x0B,
+    0x00, 0x8A, 0xC4, 0xAA,
+    0x00, 0x00, 0x2D, 0xB4,
+    0x00, 0x00, 0x03, 0xE8,
+    0x00, 0x00, 0x26, 0x16,
+    0x01, 0x01, 0x00, 0x00,
+    0x00, 0x00, 0x13, 0x8B,
+    0x00, 0x24, 0x8E, 0x5F,
+    0x00, 0x00, 0x94, 0x0A,
+    0x00, 0x8A, 0x92, 0xD7,
+    0x00, 0x00, 0x2D, 0xB4,
+    0x00, 0x00, 0x03, 0xE8,
+    0x00, 0x00, 0x26, 0x20,
+    0x99, 0x99
+    ];
+
 /// When put this data in segment_read, Uart.read() return Err
 const READ_DATA_ERROR: [u8; crate::READ_DATA_SIZE] = [0xff; crate::READ_DATA_SIZE];
 
@@ -224,4 +244,17 @@ fn test_jsk_mk_196_change_bitrate_method_return_true() {
 
     assert_eq!(device.get_hardware().borrow().get_uart().segment_write_len, crate::SEGMENT_WRITE_CHANGE_BIT_RATE);
     assert_eq!(device.get_hardware().borrow().get_uart().segment_write, [0x00, 0x10, 0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x06, 0x2b, 0xd6]);
+}
+
+#[test]
+fn test_crc() { 
+  assert!(crate::is_crc_ok(&READ_DATA_OK));
+  assert!(crate::is_crc_ok(&READ_DATA_OK_2));
+}
+
+#[test]
+fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_bad_crc() {
+    let mut device = setup(READ_DATA_BAD_CRC, WRITE_DATA_OK);
+
+    assert!(device.read().is_err() == true);
 }

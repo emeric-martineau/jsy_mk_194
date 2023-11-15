@@ -63,6 +63,34 @@ const POWER_SIGN_1: usize = 27;
 /// Power sign 2
 const POWER_SIGN_2: usize = 28;
 
+type CrcCheck = fn(&[u8]) -> bool;
+
+// From https://ctlsys.com/support/how_to_compute_the_modbus_rtu_message_crc/
+fn is_crc_ok(buf: &[u8]) -> bool {
+    let mut crc: u16 = 0xFFFF;
+    let low = buf.len() - 2;
+    let hi = buf.len() - 1;
+    let buf_crc: u16 = (buf[hi] as u16) * 256 + (buf[low] as u16);
+    
+    for pos in 0..(buf.len() - 2) {
+      crc ^= buf[pos] as u16;          // XOR byte into least sig. byte of crc
+    
+      for _ in (0..8).rev() {          // Loop over each bit
+        if (crc & 0x0001) != 0 {       // If the LSB is set
+          crc >>= 1;                   // Shift right and XOR 0xA001
+          crc ^= 0xA001;
+        } else {                            // Else LSB is not set
+          crc >>= 1;                   // Just shift right
+        }
+      }
+    }
+    // Note, this number has low and high bytes swapped, so use it accordingly (or swap bytes)
+    crc == buf_crc
+}
+
+fn crc_always_ok(_buf: &[u8]) -> bool {
+    true
+}
 
 /// Value to change bitrate
 pub enum ChangeBitrate {
@@ -88,6 +116,7 @@ where
     delay: D,
     segment_write: [u8; SEGMENT_WRITE], //= {0x01, 0x03, 0x00, 0x48, 0x00, 0x0E, 0x44, 0x18};
     segment_read: [u8; SEGMENT_READ],
+    is_crc_valid: CrcCheck,
 }
 
 impl<U, D> JsyMk194Hardware<U, D> 
@@ -101,7 +130,19 @@ where
             uart,
             delay,
             segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
-            segment_read: [0; SEGMENT_READ]
+            segment_read: [0; SEGMENT_READ],
+            is_crc_valid: is_crc_ok
+        }
+    }
+
+    /// Create a new struct of JsyMk194.
+    pub fn new_without_crc_check(uart: U, delay: D) -> Self {
+        Self {
+            uart,
+            delay,
+            segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
+            segment_read: [0; SEGMENT_READ],
+            is_crc_valid: crc_always_ok
         }
     }
 
@@ -125,8 +166,11 @@ where
                 format!("Try to read {} bytes, but Uart read only {} bytes", READ_DATA_SIZE, data_size)));
             }
 
-            // TODO check CRC ?
-            Ok(())
+            if (self.is_crc_valid)(&self.segment_read[0..data_size]) {
+                Ok(())
+            } else {
+                Err(error::UartError::from(error::UartErrorKind::BadCrc))
+            }
           },
           Err(e) => Err(e)
         }
@@ -204,6 +248,8 @@ where
         data[9] = crc1;
         data[10] = crc2;
     }
+
+
 
     #[cfg(test)]
     fn get_uart(&self) -> &U {
