@@ -1,5 +1,7 @@
+//! Error of JsyMk194 struct
 use std::fmt;
 
+/// Uart type of error
 #[derive(Debug, Clone, PartialEq)]
 pub enum UartErrorKind {
     Read,
@@ -10,6 +12,7 @@ pub enum UartErrorKind {
     Other,
 }
 
+/// Uart error with type and message
 #[derive(Debug, Clone)]
 pub struct UartError {
     pub message: String,
@@ -46,6 +49,7 @@ impl UartError {
     }
 }
 
+/// Error return by change bitrate
 #[derive(Debug, Clone)]
 pub struct ChangeBitrateError {
     pub parent: UartError

@@ -1,28 +1,32 @@
+//! JSY-MK-194 is hardware to read power of line.
+//! Please see [official website](https://jsy-tek.com/products/ac-electric-energy-metering-module/single-phase-2-way-power-metering-module-modbus-ttl-electric-energy-metering-pcba).
+//! 
+//! This crate was inspered by [jsy-mk-194.cpp](https://github.com/clankgeek/JSY-MK-194/blob/main/src/jsy-mk-194.cpp) library.
+//!
+//! JSY-MK-194 return  data in 61 bytes array:
+//! 
+//! | Order of data | Data               | byte index     |
+//! |---------------|--------------------|----------------|
+//! |             1 | header of response | 0, 1, 2        |
+//! |             2 | voltage1           | 3, 4, 5, 6     |
+//! |             3 | current1           | 7, 8, 9, 10    |
+//! |             4 | power1             | 11, 12, 13, 14 |
+//! |             5 | positive kwh1      | 15, 16, 17, 18 |
+//! |             6 | power factor1      | 19, 20, 21, 22 |
+//! |             7 | negative kwh1      | 23, 24, 25, 26 |
+//! |             8 | negative1          | 27             |
+//! |               | negative2          | 28             |
+//! |               | not used           | 29, 30         |
+//! |             9 | frequency          | 31, 32, 33, 34 |
+//! |            10 | voltage2           | 35, 36, 37, 38 |
+//! |            11 | current2           | 39, 40, 41, 42 |
+//! |            12 | power2             | 43, 44, 45, 46 |
+//! |            13 | positive kwh2      | 47, 48, 49, 50 |
+//! |            14 | power factor2      | 51, 52, 53, 54 |
+//! |            15 | negative kwh2      | 55, 56, 57, 58 |
+//! |            16 | crc                | 59, 60         |
+//! 
 use std::{cell::RefCell, rc::Rc};
-
-/// JSY-MK-194 is hardware to read power of line.
-/// Please see official website here: https://jsy-tek.com/products/ac-electric-energy-metering-module/single-phase-2-way-power-metering-module-modbus-ttl-electric-energy-metering-pcba
-/// 
-/// Original code from https://github.com/clankgeek/JSY-MK-194/blob/main/src/jsy-mk-194.cpp
-///
-/// Data return in 61 bytes array:
-///   [ 1] header of response 0, 1, 2
-///   [ 2] voltage1 = 3, 4, 5, 6
-///   [ 3] current1 = 7, 8, 9, 10
-///   [ 4] power1 = 11, 12, 13, 14
-///   [ 5] positive kwh1 = 15, 16, 17, 18
-///   [ 6] power factor1 = 19, 20, 21, 22
-///   [ 7] negative kwh1 = 23, 24, 25, 26
-///   [ 8] negative1 = 27
-///        negative2 = 28
-///        not used = 29, 30
-///   [ 9] frequency = 31, 32, 33, 34
-///   [10] voltage2 = 35, 36, 37, 38
-///   [11] current2 = 39, 40, 41, 42
-///   [12] power2 = 43, 44, 45, 46
-///   [13] positive kwh2 = 47, 48, 49, 50
-///   [14] power factor2 = 51, 52, 53, 54
-///   [15] negative kwh2 = 55, 56, 57, 58
 use embedded_hal::blocking::delay::DelayMs;
 
 pub mod error;
@@ -100,6 +104,7 @@ pub enum ChangeBitrate {
   B38400
 }
 
+/// Uart trait that must be impremented for specific hardware
 pub trait Uart {
     /// Read multiple bytes into a slice
     fn read(&mut self, buf: &mut [u8], timeout: u32) -> Result<usize, error::UartError>;
@@ -107,6 +112,8 @@ pub trait Uart {
     /// Write multiple bytes from a slice
     fn write(&mut self, bytes: &[u8]) -> Result<usize, error::UartError>;
 }
+
+/// Parent JSY MK 194 driver
 pub struct JsyMk194Hardware<U, D> 
 where
     U: Uart,
@@ -249,15 +256,13 @@ where
         data[10] = crc2;
     }
 
-
-
     #[cfg(test)]
     fn get_uart(&self) -> &U {
         &self.uart
     }
 }
 
-
+/// Channel struct to get information. JSY MK 194 has 2 channels
 pub struct Channel<U, D>
 where
     U: Uart,
@@ -319,6 +324,7 @@ where
     }
 }
 
+/// Global struct to communicate with JSY MK 194
 pub struct JsyMk194<U, D> 
 where
     U: Uart,
@@ -350,14 +356,17 @@ where
         me
     }
 
+    /// Read data from JsyMk194
     pub fn read(&mut self) -> Result<(), error::UartError> {
         self.hardware.borrow_mut().read()
     }
 
+    /// Return frequency of voltage
     pub fn frequency(&self) -> f32 {
         self.hardware.borrow().frequency()
     }
 
+    /// Change bitrate of JsyMk194 to communicate. Becarefull, change are permanent
     pub fn change_bitrate(&mut self, new_bitrate: ChangeBitrate) -> Result<(), error::ChangeBitrateError> {
         self.hardware.borrow_mut().change_bitrate(new_bitrate)
     }
