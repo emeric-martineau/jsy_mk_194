@@ -269,3 +269,21 @@ fn test_jsk_mk_196_read_method_return_error_cause_read_to_device_return_bad_crc(
         Err(e) => assert_eq!(e.kind, crate::error::UartErrorKind::BadCrc)
     };
 }
+
+#[test]
+fn test_jsk_mk_196_read_method_return_ok_when_read_to_device_return_bad_crc() {
+    let uart = UartTestImpl {
+        segment_write: WRITE_DATA_OK,
+        segment_read: READ_DATA_BAD_CRC,
+        segment_write_len: 0
+    };
+
+    let delay = DelayTestImpl {};
+
+    let mut device = crate::JsyMk194::new_without_crc_check(uart, delay);
+
+    match device.read() {
+        Ok(()) => assert!(true),
+        Err(_) => assert!(false)
+    };
+}

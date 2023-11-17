@@ -356,6 +356,22 @@ where
         me
     }
 
+    /// Create a new struct of JsyMk194 but disable CRC data virification.
+    pub fn new_without_crc_check(uart: U, delay: D) -> Self {
+        let h = JsyMk194Hardware::new_without_crc_check(uart, delay);
+
+        let mut me = Self {
+            hardware: Rc::new(RefCell::new(h)),
+            channel1: Channel::new(None, CHANNEL_1_OFFSET, POWER_SIGN_1),
+            channel2: Channel::new(None, CHANNEL_2_OFFSET, POWER_SIGN_2),
+        };
+
+        me.channel1.hardware = Some(me.hardware.clone());
+        me.channel2.hardware = Some(me.hardware.clone());
+
+        me
+    }
+
     /// Read data from JsyMk194
     pub fn read(&mut self) -> Result<(), error::UartError> {
         self.hardware.borrow_mut().read()
