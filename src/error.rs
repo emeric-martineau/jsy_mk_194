@@ -16,7 +16,7 @@ pub enum UartErrorKind {
 #[derive(Debug, Clone)]
 pub struct UartError {
     pub message: String,
-    pub kind: UartErrorKind
+    pub kind: UartErrorKind,
 }
 
 impl fmt::Display for UartError {
@@ -28,23 +28,20 @@ impl fmt::Display for UartError {
 
 impl UartError {
     pub fn new(kind: UartErrorKind, message: String) -> Self {
-        Self {
-            message,
-            kind
-        }
+        Self { message, kind }
     }
 
     pub fn from(kind: UartErrorKind) -> Self {
         Self {
             message: String::new(),
-            kind
+            kind,
         }
     }
 
     pub fn other(message: String) -> Self {
         Self {
             message,
-            kind: UartErrorKind::Other
+            kind: UartErrorKind::Other,
         }
     }
 }
@@ -52,7 +49,7 @@ impl UartError {
 /// Error return by change bitrate
 #[derive(Debug, Clone)]
 pub struct ChangeBitrateError {
-    pub parent: UartError
+    pub parent: UartError,
 }
 
 impl fmt::Display for ChangeBitrateError {
@@ -63,8 +60,6 @@ impl fmt::Display for ChangeBitrateError {
 
 impl ChangeBitrateError {
     pub fn new(parent: UartError) -> Self {
-        Self {
-            parent
-        }
+        Self { parent }
     }
 }
