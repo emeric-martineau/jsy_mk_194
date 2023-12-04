@@ -49,7 +49,7 @@ Then, you need call `read()` method:
 let mut jsy_my_194 = jsy_my_194::new(my_uart_impl, my_delay_impl);
 let _ = jsy_my_194.read();
 
-print!("First channel power: {}", jsy_my_194.power_1());
+print!("First channel power: {}", jsy_my_194.channel1.power());
 ```
 
 That's all!
