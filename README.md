@@ -1,6 +1,6 @@
 # Rust crate for JSY-MK-194
 
-## What is JSY-MK-194 ?
+## What is JSY-MK-194?
 
 JSY-MK-194 is hardware to get some informations about current, voltage, frequency of AC current.
 

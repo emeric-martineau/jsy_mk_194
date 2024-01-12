@@ -27,7 +27,6 @@
 //! |            16 | crc                | 59, 60         |
 //!
 use embedded_hal::blocking::delay::DelayMs;
-use std::{cell::RefCell, rc::Rc};
 
 pub mod error;
 #[cfg(test)]
@@ -99,6 +98,37 @@ fn crc_always_ok(_buf: &[u8]) -> bool {
     true
 }
 
+/// Convert a 32 bits value returned in 4 bytes, to a 32 bit
+#[inline(always)]
+fn conv8to32(hi_byte: u8, mid_byte_2: u8, mid_byte_1: u8, lo_byte: u8) -> u32 {
+    lo_byte as u32
+        + ((mid_byte_1 as u32) << 8)
+        + ((mid_byte_2 as u32) << 16)
+        + ((hi_byte as u32) << 24)
+}
+
+/// Get data number X (see crate doc)
+fn get_data(segment_read: &[u8; SEGMENT_READ], n: usize) -> u32 {
+    conv8to32(
+        segment_read[n],
+        segment_read[n + 1],
+        segment_read[n + 2],
+        segment_read[n + 3],
+    )
+}
+
+/// Get power with right sign.
+#[inline(always)]
+fn power(segment_read: &[u8; SEGMENT_READ], power: usize, sign: usize) -> f32 {
+    let p = (get_data(segment_read, power) as f32) * 0.0001;
+
+    if segment_read[sign] == 1 && p > 0.0 {
+        return -p;
+    }
+
+    p
+}
+
 /// Value to change bitrate
 pub enum ChangeBitrate {
     B4800,
@@ -116,8 +146,77 @@ pub trait Uart {
     fn write(&mut self, bytes: &[u8]) -> Result<usize, error::UartError>;
 }
 
-/// Parent JSY MK 194 driver
-pub struct JsyMk194Hardware<U, D>
+/// Channel struct to get information. JSY MK 194 has 2 channels
+pub struct Channel {
+    data_offset: usize,
+    power_sign: usize,
+    voltage: f32,
+    current: f32,
+    positive_energy: f32,
+    negative_energy: f32,
+    power: f32,
+    factor: f32,
+}
+
+impl Channel {
+    pub fn new(data_offset: usize, power_sign: usize) -> Self {
+        Self {
+            data_offset,
+            power_sign,
+            voltage: 0.0,
+            current: 0.0,
+            positive_energy: 0.0,
+            negative_energy: 0.0,
+            power: 0.0,
+            factor: 0.0,
+        }
+    }
+
+    /// Return the voltage of first channel in volt.
+    pub fn voltage(&self) -> f32 {
+        self.voltage
+    }
+
+    /// Return current in A of channel.
+    pub fn current(&self) -> f32 {
+        self.current
+    }
+
+    /// Return positive energy in kW/h of channel.
+    pub fn positive_energy(&self) -> f32 {
+        self.positive_energy
+    }
+
+    /// Return negative energy in kW/h of channel.
+    pub fn negative_energy(&self) -> f32 {
+        self.negative_energy
+    }
+
+    /// Return the power of channel in watt.
+    pub fn power(&self) -> f32 {
+        self.power
+    }
+
+    /// Return the power of channel in watt.
+    pub fn factor(&self) -> f32 {
+        self.factor
+    }
+
+    /// Update all data
+    fn update(&mut self, segment_read: &[u8; SEGMENT_READ]) {
+        self.voltage = (get_data(segment_read, self.data_offset + VOLTAGE) as f32) * 0.0001;
+        self.current = (get_data(segment_read, self.data_offset + CURRENT) as f32) * 0.0001;
+        self.positive_energy =
+            (get_data(segment_read, self.data_offset + POSITIVE_ENERGY) as f32) * 0.0001;
+        self.negative_energy =
+            (get_data(segment_read, self.data_offset + NEGATIVE_ENERGY) as f32) * 0.0001;
+        self.factor = (get_data(segment_read, self.data_offset + FACTOR) as f32) * 0.001;
+        self.power = power(segment_read, self.data_offset + POWER, self.power_sign);
+    }
+}
+
+/// Global struct to communicate with JSY MK 194
+pub struct JsyMk194<U, D>
 where
     U: Uart,
     D: DelayMs<u16>,
@@ -127,9 +226,13 @@ where
     segment_write: [u8; SEGMENT_WRITE], //= {0x01, 0x03, 0x00, 0x48, 0x00, 0x0E, 0x44, 0x18};
     segment_read: [u8; SEGMENT_READ],
     is_crc_valid: CrcCheck,
+    frequency: f32,
+
+    pub channel1: Channel,
+    pub channel2: Channel,
 }
 
-impl<U, D> JsyMk194Hardware<U, D>
+impl<U, D> JsyMk194<U, D>
 where
     U: Uart,
     D: DelayMs<u16>,
@@ -142,6 +245,9 @@ where
             segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
             segment_read: [0; SEGMENT_READ],
             is_crc_valid: is_crc_ok,
+            channel1: Channel::new(CHANNEL_1_OFFSET, POWER_SIGN_1),
+            channel2: Channel::new(CHANNEL_2_OFFSET, POWER_SIGN_2),
+            frequency: 0.0,
         }
     }
 
@@ -153,6 +259,9 @@ where
             segment_write: [0x01, 0x03, 0x00, 0x48, 0x00, 0x0e, 0x44, 0x18],
             segment_read: [0; SEGMENT_READ],
             is_crc_valid: crc_always_ok,
+            channel1: Channel::new(CHANNEL_1_OFFSET, POWER_SIGN_1),
+            channel2: Channel::new(CHANNEL_2_OFFSET, POWER_SIGN_2),
+            frequency: 0.0,
         }
     }
 
@@ -176,6 +285,9 @@ where
                 }
 
                 if (self.is_crc_valid)(&self.segment_read[0..data_size]) {
+                    self.channel1.update(&self.segment_read);
+                    self.channel2.update(&self.segment_read);
+                    self.frequency = (get_data(&self.segment_read, FREQUENCY) as f32) * 0.01;
                     Ok(())
                 } else {
                     Err(error::UartError::from(error::UartErrorKind::BadCrc))
@@ -187,7 +299,7 @@ where
 
     /// Return frequency in hz.
     pub fn frequency(&self) -> f32 {
-        (self.get_data(FREQUENCY) as f32) * 0.01
+        self.frequency
     }
 
     /// Default bitrate is 4800, you can update the bitrate of module
@@ -231,35 +343,6 @@ where
         }
     }
 
-    /// Convert a 32 bits value returned in 4 bytes, to a 32 bit
-    fn conv8to32(&self, hi_byte: u8, mid_byte_2: u8, mid_byte_1: u8, lo_byte: u8) -> u32 {
-        lo_byte as u32
-            + ((mid_byte_1 as u32) << 8)
-            + ((mid_byte_2 as u32) << 16)
-            + ((hi_byte as u32) << 24)
-    }
-
-    /// Get data number X (see crate doc)
-    fn get_data(&self, n: usize) -> u32 {
-        self.conv8to32(
-            self.segment_read[n],
-            self.segment_read[n + 1],
-            self.segment_read[n + 2],
-            self.segment_read[n + 3],
-        )
-    }
-
-    /// Get power with right sign.
-    fn power(&self, power: usize, sign: usize) -> f32 {
-        let p = (self.get_data(power) as f32) * 0.0001;
-
-        if self.segment_read[sign] == 1 && p > 0.0 {
-            return -p;
-        }
-
-        p
-    }
-
     fn update_segment(
         &self,
         data: &mut [u8; SEGMENT_WRITE_CHANGE_BIT_RATE],
@@ -275,178 +358,5 @@ where
     #[cfg(test)]
     fn get_uart(&self) -> &U {
         &self.uart
-    }
-}
-
-/// Channel struct to get information. JSY MK 194 has 2 channels
-pub struct Channel<U, D>
-where
-    U: Uart,
-    D: DelayMs<u16>,
-{
-    hardware: Option<Rc<RefCell<JsyMk194Hardware<U, D>>>>,
-    data_offset: usize,
-    power_sign: usize,
-}
-
-impl<U, D> Channel<U, D>
-where
-    U: Uart,
-    D: DelayMs<u16>,
-{
-    pub fn new(
-        hardware: Option<&Rc<RefCell<JsyMk194Hardware<U, D>>>>,
-        data_offset: usize,
-        power_sign: usize,
-    ) -> Self {
-        match hardware {
-            None => Self {
-                hardware: None,
-                data_offset,
-                power_sign,
-            },
-            Some(h) => Self {
-                hardware: Some(h.clone()),
-                data_offset,
-                power_sign,
-            },
-        }
-    }
-
-    /// Return the voltage of first channel in volt.
-    pub fn voltage(&self) -> f32 {
-        (self
-            .hardware
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .borrow()
-            .get_data(self.data_offset + VOLTAGE) as f32)
-            * 0.0001
-    }
-
-    /// Return current in A of channel.
-    pub fn current(&self) -> f32 {
-        (self
-            .hardware
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_data(self.data_offset + CURRENT) as f32)
-            * 0.0001
-    }
-
-    /// Return positive energy in kW/h of channel.
-    pub fn positive_energy(&self) -> f32 {
-        (self
-            .hardware
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_data(self.data_offset + POSITIVE_ENERGY) as f32)
-            * 0.0001
-    }
-
-    /// Return negative energy in kW/h of channel.
-    pub fn negative_energy(&self) -> f32 {
-        (self
-            .hardware
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_data(self.data_offset + NEGATIVE_ENERGY) as f32)
-            * 0.0001
-    }
-
-    /// Return the power of channel in watt.
-    pub fn power(&self) -> f32 {
-        self.hardware
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .power(self.data_offset + POWER, self.power_sign)
-    }
-
-    /// Return the power of channel in watt.
-    pub fn factor(&self) -> f32 {
-        (self
-            .hardware
-            .as_ref()
-            .unwrap()
-            .borrow()
-            .get_data(self.data_offset + FACTOR) as f32)
-            * 0.001
-    }
-}
-
-/// Global struct to communicate with JSY MK 194
-pub struct JsyMk194<U, D>
-where
-    U: Uart,
-    D: DelayMs<u16>,
-{
-    hardware: Rc<RefCell<JsyMk194Hardware<U, D>>>,
-    pub channel1: Channel<U, D>,
-    pub channel2: Channel<U, D>,
-}
-
-impl<U, D> JsyMk194<U, D>
-where
-    U: Uart,
-    D: DelayMs<u16>,
-{
-    /// Create a new struct of JsyMk194.
-    pub fn new(uart: U, delay: D) -> Self {
-        let h = JsyMk194Hardware::new(uart, delay);
-
-        let mut me = Self {
-            hardware: Rc::new(RefCell::new(h)),
-            channel1: Channel::new(None, CHANNEL_1_OFFSET, POWER_SIGN_1),
-            channel2: Channel::new(None, CHANNEL_2_OFFSET, POWER_SIGN_2),
-        };
-
-        me.channel1.hardware = Some(me.hardware.clone());
-        me.channel2.hardware = Some(me.hardware.clone());
-
-        me
-    }
-
-    /// Create a new struct of JsyMk194 but disable CRC data virification.
-    pub fn new_without_crc_check(uart: U, delay: D) -> Self {
-        let h = JsyMk194Hardware::new_without_crc_check(uart, delay);
-
-        let mut me = Self {
-            hardware: Rc::new(RefCell::new(h)),
-            channel1: Channel::new(None, CHANNEL_1_OFFSET, POWER_SIGN_1),
-            channel2: Channel::new(None, CHANNEL_2_OFFSET, POWER_SIGN_2),
-        };
-
-        me.channel1.hardware = Some(me.hardware.clone());
-        me.channel2.hardware = Some(me.hardware.clone());
-
-        me
-    }
-
-    /// Read data from JsyMk194
-    pub fn read(&mut self) -> Result<(), error::UartError> {
-        self.hardware.borrow_mut().read()
-    }
-
-    /// Return frequency of voltage
-    pub fn frequency(&self) -> f32 {
-        self.hardware.borrow().frequency()
-    }
-
-    /// Change bitrate of JsyMk194 to communicate. Becarefull, change are permanent
-    pub fn change_bitrate(
-        &mut self,
-        new_bitrate: ChangeBitrate,
-    ) -> Result<(), error::ChangeBitrateError> {
-        self.hardware.borrow_mut().change_bitrate(new_bitrate)
-    }
-
-    #[cfg(test)]
-    fn get_hardware(&self) -> &Rc<RefCell<JsyMk194Hardware<U, D>>> {
-        &self.hardware
     }
 }

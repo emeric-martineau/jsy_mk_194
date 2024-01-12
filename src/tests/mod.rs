@@ -217,11 +217,11 @@ fn test_jsk_mk_196_change_bitrate_method_return_true() {
     assert!(device.change_bitrate(crate::ChangeBitrate::B9600).is_ok());
 
     assert_eq!(
-        device.get_hardware().borrow().get_uart().segment_write_len,
+        device.get_uart().segment_write_len,
         crate::SEGMENT_WRITE_CHANGE_BIT_RATE
     );
     assert_eq!(
-        device.get_hardware().borrow().get_uart().segment_write,
+        device.get_uart().segment_write,
         [0x00, 0x10, 0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x06, 0x2b, 0xd6]
     );
 }
