@@ -265,12 +265,17 @@ where
         }
     }
 
-    /// Read data.
+    // Read and wait 100ms
     pub fn read(&mut self) -> Result<(), error::UartError> {
+        self.read_with_timeout(100)
+    }
+
+    /// Read data.
+    pub fn read_with_timeout(&mut self, timeout_ms: u32) -> Result<(), error::UartError> {
         // send segment to JSY-MK-194
         self.uart.write(&self.segment_write)?;
 
-        let is_read_data = self.uart.read(&mut self.segment_read, 100);
+        let is_read_data = self.uart.read(&mut self.segment_read, timeout_ms);
 
         match is_read_data {
             Ok(data_size) => {

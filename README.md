@@ -54,6 +54,13 @@ print!("First channel power: {}", jsy_my_194.channel1.power());
 
 That's all!
 
+## Changelog
+
+### 1.0.1
+
+- Rewrite module to be more easy to understand
+- Add new public `read_with_timeout` method to allow user set his timeout
+
 ## License
 
 The code is released under MIT License to allow every body to use it in all conditions. If you love open-source software and this crate, please give some money to [HaikuOS](https://haiku-os.org/) or [ReactOS](https://reactos.org).
