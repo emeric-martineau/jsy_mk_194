@@ -1,4 +1,4 @@
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs;
 
 /// When put this data in segment_read, Uart.read() return Ok
 const READ_DATA_OK: [u8; crate::READ_DATA_SIZE] = [
@@ -82,8 +82,12 @@ impl crate::Uart for UartTestImpl {
 
 struct DelayTestImpl {}
 
-impl DelayMs<u16> for DelayTestImpl {
-    fn delay_ms(&mut self, _ms: u16) {
+impl DelayNs for DelayTestImpl {
+    fn delay_ms(&mut self, _ms: u32) {
+        // Do nothing
+    }
+
+    fn delay_ns(&mut self, _ns: u32) {
         // Do nothing
     }
 }

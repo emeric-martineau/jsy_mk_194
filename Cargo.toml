@@ -1,6 +1,6 @@
 [package]
 name = "jsy_mk_194"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Emeric Martineau <11473190+emeric-martineau@users.noreply.github.com>"]
 edition = "2021"
 resolver = "2"
@@ -13,4 +13,4 @@ readme = "README.md"
 repository = "https://github.com/emeric-martineau/jsy_mk_194"
 
 [dependencies]
-embedded-hal = "0.2.7"
+embedded-hal = "1.0.0"
