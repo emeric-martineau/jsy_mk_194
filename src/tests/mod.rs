@@ -78,6 +78,10 @@ impl crate::Uart for UartTestImpl {
 
         Ok(bytes.len())
     }
+    
+    fn change_baudrate(&mut self, f: u32) -> Result<(), crate::error::UartError>  {
+        Ok(())
+    }
 }
 
 struct DelayTestImpl {}

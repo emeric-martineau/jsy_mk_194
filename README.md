@@ -56,6 +56,14 @@ That's all!
 
 ## Changelog
 
+### 1.0.3
+
+- Allow update UART after change bitrate
+
+### 1.0.2
+
+DON'T USE IT. IT'S MISTAKE
+
 ### 1.0.1
 
 - Rewrite module to be more easy to understand

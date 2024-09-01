@@ -27,6 +27,7 @@
 //! |            16 | crc                | 59, 60         |
 //!
 use embedded_hal::blocking::delay::DelayMs;
+use error::UartError;
 
 pub mod error;
 #[cfg(test)]
@@ -144,6 +145,9 @@ pub trait Uart {
 
     /// Write multiple bytes from a slice
     fn write(&mut self, bytes: &[u8]) -> Result<usize, error::UartError>;
+
+    /// Allow change uart config
+    fn change_baudrate(&mut self, f: u32) -> Result<(), error::UartError> ;
 }
 
 /// Channel struct to get information. JSY MK 194 has 2 channels
@@ -346,6 +350,10 @@ where
             }
             Err(e) => Err(error::ChangeBitrateError::new(e)),
         }
+    }
+
+    pub fn change_baudrate(&mut self, f: u32) -> Result<(), UartError> {
+        self.uart.change_baudrate(f)
     }
 
     fn update_segment(
