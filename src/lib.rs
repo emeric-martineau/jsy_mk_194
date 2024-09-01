@@ -26,7 +26,7 @@
 //! |            15 | negative kwh2      | 55, 56, 57, 58 |
 //! |            16 | crc                | 59, 60         |
 //!
-use embedded_hal::delay::DelayNs;
+use embedded_hal::blocking::delay::DelayMs;
 
 pub mod error;
 #[cfg(test)]
@@ -219,7 +219,7 @@ impl Channel {
 pub struct JsyMk194<U, D>
 where
     U: Uart,
-    D: DelayNs,
+    D: DelayMs<u16>,
 {
     uart: U,
     delay: D,
@@ -235,7 +235,7 @@ where
 impl<U, D> JsyMk194<U, D>
 where
     U: Uart,
-    D: DelayNs,
+    D: DelayMs<u16>,
 {
     /// Create a new struct of JsyMk194.
     pub fn new(uart: U, delay: D) -> Self {
