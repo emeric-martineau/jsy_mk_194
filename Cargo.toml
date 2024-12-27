@@ -1,16 +1,16 @@
 [package]
 name = "jsy_mk_194"
-version = "1.0.3"
+version = "2.0.0"
 authors = ["Emeric Martineau <11473190+emeric-martineau@users.noreply.github.com>"]
 edition = "2021"
 resolver = "2"
-rust-version = "1.66"
+rust-version = "1.81"
 description = "Rewrite of power reader JSY-MK-194. Tested on ESP32"
 homepage = "https://github.com/emeric-martineau/jsy_mk_194"
-keywords = ["embedded", "JSY-MK-194", "Esp32"]
+keywords = ["embedded", "JSY-MK-194", "Esp32", "embedded-hal v1"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/emeric-martineau/jsy_mk_194"
 
 [dependencies]
-embedded-hal = "0.2.7"
+embedded-hal = "1.0.0"
